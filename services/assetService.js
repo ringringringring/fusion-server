@@ -1,14 +1,14 @@
 const db = require('trustnote-common/db');
-const validationUtils = require('trustnote-common/validation_utils.js');
+const validation = require('../utils/validation');
 const storage = require('trustnote-common/storage');
 
 let assetService = {};
 
 assetService.queryBalance = function (address, asset) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         let err;
 
-        err = validationUtils.isValidAddress(address) ? null : "invalid address";
+        await validation.address(address).catch(e => { err = e });
         if (err) {
             reject(err);
         }
@@ -60,10 +60,10 @@ async function readAllJoint(rows) {
 }
 
 assetService.queryHistory = function (address, asset, pageXOffset, size) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         let err;
 
-        err = validationUtils.isValidAddress(address) ? null : "invalid address";
+        await validation.address(address).catch(e => { err = e });
         if (err) {
             reject(err);
         }
@@ -83,6 +83,33 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
             reject("get history error");
         }
 
+    })
+}
+
+assetService.transfer = function (payer, outputs, message) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            await validation.address(payer).catch(e => { throw "invalid address of payer" })
+            await validation.message(message).catch(e => { throw e })
+            await validation.outputs(outputs).catch(e => { throw e })
+        } catch (err) {
+            reject(err);
+        }
+
+        outputs.push({ address: payer, amount: 0 })
+/*
+        // add charge address
+        tutil.asyncPrepare('base', payer, outputs, function () {
+            txService.composeBaseAssetPayment(payer, outputs, message, function (b64_to_sign, objoint) {
+                lru.set(objoint.unit.unit, objoint)
+                var data = { "b64_to_sign": b64_to_sign, "txid": objoint.unit.unit, unit: objoint }
+                _.handleResponse(res, data)
+            }, function (error) {
+                next(tutil.HandleSystemError(error))
+            })
+        }, function (err) {
+            next(err)
+        }) */
     })
 }
 

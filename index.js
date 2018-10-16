@@ -33,7 +33,7 @@ app.use(morgan('combined', { stream: accessLogStream }))
 const asset = require('./routers/asset')
 const account = require('./routers/account')
 
-app.use('/api/v1/query', asset)
+app.use('/api/v1/asset', asset)
 app.use('/api/v1/account', account)
 
 

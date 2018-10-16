@@ -2,6 +2,7 @@ const resp = require('../utils/responseUtil');
 const express = require('express');
 const router = express.Router();
 const assetService = require('../services/assetService');
+const validation = require('../utils/validation');
 
 router.get('/balance/:address/:asset', function (req, res, next) {
     let address = req.params.address;
@@ -27,6 +28,19 @@ router.get('/txhistory/:address/:asset/:index/:size', function (req, res, next) 
         resp.handleResponse(res, null, err);
     })
 
+})
+
+router.post('/transferttt', async function (req, res, next) {
+
+    var payer = req.body.payer
+    var outputs = req.body.outputs
+    var message = req.body.message
+
+    assetService.transfer(payer, outputs, message).then(ret => {
+        resp.handleResponse(res, ret);
+    }).catch(err => {
+        resp.handleResponse(res, null, err);
+    })
 })
 
 module.exports = router
