@@ -1,9 +1,10 @@
 const db = require('trustnote-common/db');
 const validation = require('../utils/validation');
-const storage = require('trustnote-common/storage');
+const jointService = require('./jointService');
 
 let assetService = {};
 
+// 查询余额
 assetService.queryBalance = function (address, asset) {
     return new Promise(async (resolve, reject) => {
         let err;
@@ -32,33 +33,15 @@ assetService.queryBalance = function (address, asset) {
                         balance[row.is_stable ? 'stable' : 'pending'] = row.balance;
                     }
                 }
+                else {
+                    reject("address not exist")
+                }
                 resolve(balance);
             })
     })
 }
 
-function readJoint(unit) {
-    return new Promise(resolve => {
-        storage.readJoint(db, unit, {
-            ifFound: function (objJoint) {
-                resolve(objJoint);
-            },
-            ifNotFound: function () {
-                console.error('get history error')
-            }
-        })
-    })
-}
-
-async function readAllJoint(rows) {
-    let arrJoint = [];
-    for (let row of rows) {
-        let joint = await readJoint(row.unit);
-        arrJoint.push(joint);
-    }
-    return arrJoint;
-}
-
+// 查询交易历史
 assetService.queryHistory = function (address, asset, pageXOffset, size) {
     return new Promise(async (resolve, reject) => {
         let err;
@@ -75,7 +58,7 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
         try {
             db.query('SELECT unit FROM outputs WHERE address=? AND asset is ? ORDER BY output_id DESC LIMIT ?,?',
                 [address, asset, pageXOffset, size], function (rows) {
-                    readAllJoint(rows).then(arrJoint => {
+                    jointService.readMultiJoint(db, rows).then(arrJoint => {
                         resolve(arrJoint);
                     })
                 })
@@ -86,6 +69,7 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
     })
 }
 
+// 发起交易
 assetService.transfer = function (payer, outputs, message) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -97,19 +81,82 @@ assetService.transfer = function (payer, outputs, message) {
         }
 
         outputs.push({ address: payer, amount: 0 })
-/*
-        // add charge address
-        tutil.asyncPrepare('base', payer, outputs, function () {
-            txService.composeBaseAssetPayment(payer, outputs, message, function (b64_to_sign, objoint) {
-                lru.set(objoint.unit.unit, objoint)
-                var data = { "b64_to_sign": b64_to_sign, "txid": objoint.unit.unit, unit: objoint }
-                _.handleResponse(res, data)
-            }, function (error) {
-                next(tutil.HandleSystemError(error))
+
+        try {
+            await assetService.checkAsset(asset).catch(e => { throw e });
+            await assetService.checkAssetIsStable(asset).catch(e => { throw e });
+            await assetService.checkAssetBalance(address, asset, outputs).catch(e => { throw e });
+        } catch (err) {
+            reject(err);
+        }
+
+        jointService.composeJoint(payer, outputs, message, function (b64_to_sign, objoint) {
+            console.log(b64_to_sign);
+            console.log(objoint);
+        },function (error) {
+            console.log(error);
+        })
+    })
+}
+
+// 检查资产是否存在
+assetService.checkAsset = function (asset) {
+    return new Promise((resolve, reject) => {
+        if (asset == "TTT") {
+            resolve();
+        }
+        else {
+            db.query("SELECT 1 FROM assets WHERE unit=?", [asset], function (rows) {
+                if (rows.length) {
+                    resolve();
+                }
+                else {
+                    reject("asset not exist")
+                }
             })
-        }, function (err) {
-            next(err)
-        }) */
+        }
+    })
+}
+
+// 检查资产是否稳定状态
+assetService.checkAssetIsStable = function (asset) {
+    return new Promise((resolve, reject) => {
+        if (asset == "TTT") {
+            resolve();
+        }
+        else {
+            db.query('SELECT 1 FROM units WHERE unit=? AND is_stable=1', [asset], function (rows) {
+                if (rows.length) {
+                    resolve();
+                }
+                else {
+                    reject("unit not stable yet");
+                }
+            })
+        }
+    })
+}
+
+assetService.checkAssetBalance = function (address, asset, outputs) {
+    return new Promise(async (resolve, reject) => {
+        let accumulated_amount = 0;
+        let totalBalance;
+        for (let output of outputs) {
+            accumulated_amount += output.amount;
+        }
+
+        await assetService.queryBalance(address, asset).then(balance => {
+            totalBalance = balance.stable;
+        }).catch(err => {
+            reject(err);
+        })
+
+        if (totalBalance >= accumulated_amount) {
+            resolve();
+        }
+        else {
+            reject(`not enough asset: ${asset} from address ${address}`);
+        }
     })
 }
 

@@ -2,7 +2,6 @@ const resp = require('../utils/responseUtil');
 const express = require('express');
 const router = express.Router();
 const assetService = require('../services/assetService');
-const validation = require('../utils/validation');
 
 router.get('/balance/:address/:asset', function (req, res, next) {
     let address = req.params.address;

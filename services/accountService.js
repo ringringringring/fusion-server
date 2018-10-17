@@ -36,4 +36,17 @@ accountService.register = function (pubkey) {
     })
 }
 
+accountService.checkAccount = function (address) {
+    return new Promise((resolve, reject) => {
+        db.query('SELECT 1 FROM account_list WHERE address=?', [address], function (rows) {
+            if (rows.length) {
+                resolve(rows[0].address);
+            }
+            else {
+                reject('account not register yet')
+            }
+        })
+    })
+}
+
 module.exports = accountService;
