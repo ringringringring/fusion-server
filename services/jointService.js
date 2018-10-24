@@ -1,4 +1,7 @@
-const storage = require('trustnote-common/storage');
+const storage = require('trustnote-common/storage.js');
+const constants = require('trustnote-common/constants.js');
+const Wallet = require('trustnote-common/wallet.js');
+const objectHash = require('trustnote-common/object_hash.js');
 
 let jointService = {}
 
@@ -24,51 +27,47 @@ jointService.readMultiJoint = async function (db, rows) {
     return arrJoint;
 }
 
-jointService.composeJoint = function (payer, arrOutputs, text, callbacks, errorHandler) {
-    let composer = require('trustnote-common/composer.js');
-
-    var callback = {
-        ifError: onError,
-        ifNotEnoughFunds: errorHandler,
-        ifOk: function (objJoint, arrChains) {
-            var newJoint = removeFakeSignature(objJoint, [payer])
-            var buf_to_sign = objectHash.getUnitHashToSign(newJoint.unit)
-            var b64ToSign = buf_to_sign.toString('base64')
-            callbacks(b64ToSign, newJoint)
-        }
-    }
-
-    composer.composeConsignorJoint(payer, arrOutputs, text, jointService.signer, callback);
-}
-
-jointService.signer = {
-    readSigningPaths: function (conn, address, handleLengthsBySigningPaths) {
-        handleLengthsBySigningPaths({ r: constants.SIG_LENGTH });
-    },
-    readDefinition: function (conn, address, handleDefinition) {
-        conn.query("SELECT definition FROM my_addresses WHERE address=?", [address], function (rows) {
-            if (rows.length !== 1)
-                throw "definition not found";
-            handleDefinition(null, JSON.parse(rows[0].definition));
-        });
-    },
-    sign: function (objUnsignedUnit, assocPrivatePayloads, address, signing_path, handleSignature) {
-        var buf_to_sign = objectHash.getUnitHashToSign(objUnsignedUnit);
-        db.query(
-            "SELECT wallet, account, is_change, address_index \n\
-			FROM my_addresses JOIN wallets USING(wallet) JOIN wallet_signing_paths USING(wallet) \n\
-			WHERE address=? AND signing_path=?",
-            [address, signing_path],
-            function (rows) {
-                if (rows.length !== 1)
-                    throw Error(rows.length + " indexes for address " + address + " and signing path " + signing_path);
-                var row = rows[0];
-                signWithLocalPrivateKey(row.wallet, row.account, row.is_change, row.address_index, buf_to_sign, function (sig) {
-                    handleSignature(null, sig);
+jointService.composeJoint = function (asset, payer, outputs, message) {
+    let b64_to_sign;
+    let objJoint;
+    return new Promise((resolve, reject) => {
+        let signer = {
+            readSigningPaths: function (conn, address, handleLengthsBySigningPaths) {
+                handleLengthsBySigningPaths({ r: constants.SIG_LENGTH });
+            },
+            readDefinition: function (conn, address, handleDefinition) {
+                conn.query("SELECT definition FROM account_list WHERE address=?", [address], function (rows) {
+                    if (rows.length !== 1)
+                        throw "definition not found";
+                    handleDefinition(null, JSON.parse(rows[0].definition));
                 });
+            },
+            sign: function (objUnsignedUnit, assocPrivatePayloads, address, signing_path, handleSignature) {
+                let buf_to_sign = objectHash.getUnitHashToSign(objUnsignedUnit);
+                b64_to_sign = buf_to_sign.toString('base64');
+                handleSignature(null, "----------------------------------------------------------------------------------------");
             }
-        );
-    }
+        }
+
+        let cb = function (err, joint) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            objJoint = joint;
+            resolve({ b64_to_sign: b64_to_sign, txid: objJoint.unit.unit, unit: objJoint.unit });
+        }
+
+        Wallet.sendMultiPayment({
+            asset: asset,
+            paying_addresses: [payer],
+            base_outputs: asset ? null : outputs,
+            asset_outputs: asset ? outputs : null,
+            change_address: payer,
+            message: message,
+            signer: signer,
+        }, cb);
+    })
 }
 
 module.exports = jointService;

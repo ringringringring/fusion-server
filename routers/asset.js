@@ -29,17 +29,56 @@ router.get('/txhistory/:address/:asset/:index/:size', function (req, res, next) 
 
 })
 
-router.post('/transferttt', async function (req, res, next) {
+router.post('/transfer', async function (req, res, next) {
 
-    var payer = req.body.payer
-    var outputs = req.body.outputs
-    var message = req.body.message
+    let asset = req.body.asset;
+    let payer = req.body.payer;
+    let outputs = req.body.outputs;
+    let message = req.body.message;
 
-    assetService.transfer(payer, outputs, message).then(ret => {
+
+    assetService.transfer(asset, payer, outputs, message).then(ret => {
         resp.handleResponse(res, ret);
     }).catch(err => {
         resp.handleResponse(res, null, err);
     })
+})
+
+router.post('/submittx', function (req, res, next) {
+    var txid = req.body.txid
+    var sig = req.body.sig
+
+    if (!lru.has(txid)) {
+        next(new BizError('payment finished or cancel', 1006))
+        return
+    }
+
+    var unsignedunit = lru.get(txid)
+    var newunit = txService.composeFullJoint(unsignedunit, sig)
+
+    console.log(JSON.stringify(newunit))
+
+    var callbacks = {
+        ifError: function (error) {
+            next(tutil.HandleSystemError(error))
+            // return
+        },
+        ifNotEnoughFunds: function (error) {
+            next(tutil.HandleSystemError(error))
+            // return
+        },
+        ifOk: function (objJoint, arrChains) {
+            console.log('broadcastJoint backs')
+            // delete from cache!!
+            removeFromcache(objJoint.unit)
+            network.broadcastJoint(objJoint);
+
+            _.handleResponse(res, { unit: newunit.unit })
+        }
+    }
+
+    networkService.broadCastUnit(newunit, callbacks)
+
 })
 
 module.exports = router

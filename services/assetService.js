@@ -12,6 +12,7 @@ assetService.queryBalance = function (address, asset) {
         await validation.address(address).catch(e => { err = e });
         if (err) {
             reject(err);
+            return;
         }
 
         if (asset === "TTT") {
@@ -34,7 +35,8 @@ assetService.queryBalance = function (address, asset) {
                     }
                 }
                 else {
-                    reject("address not exist")
+                    reject("address not exist");
+                    return;
                 }
                 resolve(balance);
             })
@@ -49,6 +51,7 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
         await validation.address(address).catch(e => { err = e });
         if (err) {
             reject(err);
+            return;
         }
 
         if (asset === "TTT") {
@@ -64,13 +67,14 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
                 })
         } catch (error) {
             reject("get history error");
+            return;
         }
 
     })
 }
 
 // 发起交易
-assetService.transfer = function (payer, outputs, message) {
+assetService.transfer = function (asset, payer, outputs, message) {
     return new Promise(async (resolve, reject) => {
         try {
             await validation.address(payer).catch(e => { throw "invalid address of payer" })
@@ -78,23 +82,28 @@ assetService.transfer = function (payer, outputs, message) {
             await validation.outputs(outputs).catch(e => { throw e })
         } catch (err) {
             reject(err);
+            return;
         }
 
-        outputs.push({ address: payer, amount: 0 })
+        // outputs.push({ address: payer, amount: 0 })
 
         try {
             await assetService.checkAsset(asset).catch(e => { throw e });
             await assetService.checkAssetIsStable(asset).catch(e => { throw e });
-            await assetService.checkAssetBalance(address, asset, outputs).catch(e => { throw e });
+            await assetService.checkAssetBalance(payer, asset, outputs).catch(e => { throw e });
         } catch (err) {
             reject(err);
+            return;
         }
 
-        jointService.composeJoint(payer, outputs, message, function (b64_to_sign, objoint) {
-            console.log(b64_to_sign);
-            console.log(objoint);
-        },function (error) {
-            console.log(error);
+        if (asset === "TTT") {
+            asset = null;
+        }
+
+        jointService.composeJoint(asset, payer, outputs, message).then(data => {
+            resolve(data);
+        }).catch(err => {
+            reject(err);
         })
     })
 }
@@ -112,6 +121,7 @@ assetService.checkAsset = function (asset) {
                 }
                 else {
                     reject("asset not exist")
+                    return;
                 }
             })
         }
@@ -131,6 +141,7 @@ assetService.checkAssetIsStable = function (asset) {
                 }
                 else {
                     reject("unit not stable yet");
+                    return;
                 }
             })
         }
@@ -149,6 +160,7 @@ assetService.checkAssetBalance = function (address, asset, outputs) {
             totalBalance = balance.stable;
         }).catch(err => {
             reject(err);
+            return;
         })
 
         if (totalBalance >= accumulated_amount) {
@@ -156,6 +168,7 @@ assetService.checkAssetBalance = function (address, asset, outputs) {
         }
         else {
             reject(`not enough asset: ${asset} from address ${address}`);
+            return;
         }
     })
 }
