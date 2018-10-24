@@ -44,41 +44,16 @@ router.post('/transfer', async function (req, res, next) {
     })
 })
 
-router.post('/submittx', function (req, res, next) {
-    var txid = req.body.txid
-    var sig = req.body.sig
+router.post('/sign', function (req, res, next) {
 
-    if (!lru.has(txid)) {
-        next(new BizError('payment finished or cancel', 1006))
-        return
-    }
+    let txid = req.body.txid
+    let sig = req.body.sig
 
-    var unsignedunit = lru.get(txid)
-    var newunit = txService.composeFullJoint(unsignedunit, sig)
-
-    console.log(JSON.stringify(newunit))
-
-    var callbacks = {
-        ifError: function (error) {
-            next(tutil.HandleSystemError(error))
-            // return
-        },
-        ifNotEnoughFunds: function (error) {
-            next(tutil.HandleSystemError(error))
-            // return
-        },
-        ifOk: function (objJoint, arrChains) {
-            console.log('broadcastJoint backs')
-            // delete from cache!!
-            removeFromcache(objJoint.unit)
-            network.broadcastJoint(objJoint);
-
-            _.handleResponse(res, { unit: newunit.unit })
-        }
-    }
-
-    networkService.broadCastUnit(newunit, callbacks)
-
+    assetService.sign(txid, sig).then(ret => {
+        resp.handleResponse(res, ret);
+    }).catch(err => {
+        resp.handleResponse(res, null, err);
+    })
 })
 
 module.exports = router

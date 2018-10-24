@@ -2,6 +2,11 @@ const storage = require('trustnote-common/storage.js');
 const constants = require('trustnote-common/constants.js');
 const Wallet = require('trustnote-common/wallet.js');
 const objectHash = require('trustnote-common/object_hash.js');
+const validation = require('trustnote-common/validation.js');
+const writer = require('trustnote-common/writer.js');
+const network = require('trustnote-common/network.js')
+
+let placeholder = '----------------------------------------------------------------------------------------';
 
 let jointService = {}
 
@@ -27,6 +32,46 @@ jointService.readMultiJoint = async function (db, rows) {
     return arrJoint;
 }
 
+jointService.validate = function (objJoint) {
+    return new Promise((resolve, reject) => {
+        validation.validate(objJoint, {
+            ifUnitError: function (err) {
+                reject("Validation error: " + err);
+            },
+            ifJointError: function (err) {
+                reject("unexpected validation joint error: " + err);
+            },
+            ifTransientError: function (err) {
+                reject("unexpected validation transient error: " + err);
+            },
+            ifNeedHashTree: function () {
+                reject("unexpected need hash tree");
+            },
+            ifNeedParentUnits: function (arrMissingUnits) {
+                reject("unexpected dependencies: " + arrMissingUnits.join(", "));
+            },
+            ifOk: function (objValidationState, validation_unlock) {
+                console.log("base asset OK " + objValidationState.sequence);
+                if (objValidationState.sequence !== 'good') {
+                    validation_unlock();
+                    reject("Bad sequence " + objValidationState.sequence);
+                    return;
+                }
+                writer.saveJoint(
+                    objJoint, objValidationState,
+                    null,
+                    function onDone() {
+                        console.log("saved unit " + unit);
+                        validation_unlock();
+                        resolve(objJoint);
+                    }
+                );
+            }
+        });
+    })
+}
+
+
 jointService.composeJoint = function (asset, payer, outputs, message) {
     let b64_to_sign;
     let objJoint;
@@ -38,14 +83,14 @@ jointService.composeJoint = function (asset, payer, outputs, message) {
             readDefinition: function (conn, address, handleDefinition) {
                 conn.query("SELECT definition FROM account_list WHERE address=?", [address], function (rows) {
                     if (rows.length !== 1)
-                        throw "definition not found";
+                        throw Error("definition not found");
                     handleDefinition(null, JSON.parse(rows[0].definition));
                 });
             },
             sign: function (objUnsignedUnit, assocPrivatePayloads, address, signing_path, handleSignature) {
                 let buf_to_sign = objectHash.getUnitHashToSign(objUnsignedUnit);
                 b64_to_sign = buf_to_sign.toString('base64');
-                handleSignature(null, "----------------------------------------------------------------------------------------");
+                handleSignature(null, placeholder);
             }
         }
 
@@ -67,6 +112,23 @@ jointService.composeJoint = function (asset, payer, outputs, message) {
             message: message,
             signer: signer,
         }, cb);
+    })
+}
+
+jointService.sendJoint = function (joint, sig) {
+    return new Promise(async (resolve, reject) => {
+        let strJoint = JSON.stringify(joint);
+        let strSignedJoint = strJoint.replace(placeholder, sig);
+        let objSignedJoint = {
+            unit: JSON.parse(strSignedJoint)
+        }
+        try {
+            let objJoint = await jointService.validate(objSignedJoint).catch(e => { throw e })
+            network.broadcastJoint(objJoint);
+            resolve();
+        } catch (err) {
+            reject(err);
+        }
     })
 }
 

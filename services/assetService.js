@@ -1,6 +1,7 @@
 const db = require('trustnote-common/db');
 const validation = require('../utils/validation');
 const jointService = require('./jointService');
+const cacheService = require('./cacheService');
 
 let assetService = {};
 
@@ -101,11 +102,28 @@ assetService.transfer = function (asset, payer, outputs, message) {
         }
 
         jointService.composeJoint(asset, payer, outputs, message).then(data => {
+            cacheService.add(data.unit);
             resolve(data);
         }).catch(err => {
             reject(err);
         })
     })
+}
+
+assetService.sign = function (txid, sig) {
+    return new Promise((resolve, reject) => {
+        let isExist = cacheService.has(txid);
+        if (!isExist) {
+            reject("payment error, please re-pay later");
+            return;
+        }
+        
+        let joint = cacheService.get(txid);
+        jointService.sendJoint(joint, sig).then(ret => {
+
+        })
+    })
+
 }
 
 // 检查资产是否存在
