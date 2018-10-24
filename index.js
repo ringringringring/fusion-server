@@ -6,7 +6,10 @@ const path = require('path');
 const rfs = require('rotating-file-stream');
 const relay = require('trustnote-relay');
 const app = express();
-const init = require('./init/init');
+const intro = require('./init/intro');
+
+// init database before server start
+intro.initDb();
 
 app.use(bodyParser.json({
     limit: '1mb'
