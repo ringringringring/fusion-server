@@ -122,10 +122,12 @@ jointService.sendJoint = function (joint, sig) {
         let objSignedJoint = {
             unit: JSON.parse(strSignedJoint)
         }
+        objSignedJoint.unit.unit = objectHash.getUnitHash(objSignedJoint.unit);
+
         try {
             let objJoint = await jointService.validate(objSignedJoint).catch(e => { throw e })
             network.broadcastJoint(objJoint);
-            resolve();
+            resolve(objJoint.unit);
         } catch (err) {
             reject(err);
         }

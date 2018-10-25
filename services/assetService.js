@@ -117,10 +117,12 @@ assetService.sign = function (txid, sig) {
             reject("payment error, please re-pay later");
             return;
         }
-        
+
         let joint = cacheService.get(txid);
         jointService.sendJoint(joint, sig).then(ret => {
-
+            resolve(ret);
+        }).catch(err => {
+            reject(err);
         })
     })
 
