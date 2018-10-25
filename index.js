@@ -7,6 +7,7 @@ const rfs = require('rotating-file-stream');
 const relay = require('trustnote-relay');
 const app = express();
 const intro = require('./init/intro');
+const rateLimit = require("express-rate-limit");
 
 // init database before server start
 intro.initDb();
@@ -32,6 +33,19 @@ var accessLogStream = rfs('access.log', {
 
 // setup the logger
 app.use(morgan('combined', { stream: accessLogStream }))
+
+const limiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 50, // limit each IP to 50 requests per windowMs
+    message: {
+        network: 'devnet',
+        errCode: 429,
+        errMsg: "Too many accounts created from this IP, please try again after an hour",
+        data: null
+    }
+});
+
+app.use(limiter);
 
 const asset = require('./routers/asset')
 const account = require('./routers/account')
