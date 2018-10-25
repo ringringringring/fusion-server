@@ -83,8 +83,7 @@ jointService.composeJoint = function (asset, payer, outputs, message) {
             readDefinition: function (conn, address, handleDefinition) {
                 conn.query("SELECT definition FROM account_list WHERE address=?", [address], function (rows) {
                     if (rows.length !== 1){
-                        conn.release();
-                        reject("definition not found, please reload app or register address fisrt");
+                        handleDefinition("definition not found, please reload app or register address fisrt");
                         return;
                     }
                     handleDefinition(null, JSON.parse(rows[0].definition));
