@@ -82,7 +82,7 @@ jointService.composeJoint = function (asset, payer, outputs, message) {
             },
             readDefinition: function (conn, address, handleDefinition) {
                 conn.query("SELECT definition FROM account_list WHERE address=?", [address], function (rows) {
-                    if (rows.length !== 1){
+                    if (rows.length !== 1) {
                         handleDefinition("definition not found, please reload app or register address fisrt");
                         return;
                     }
@@ -111,10 +111,19 @@ jointService.composeJoint = function (asset, payer, outputs, message) {
             base_outputs: asset ? null : outputs,
             asset_outputs: asset ? outputs : null,
             change_address: payer,
-            message: message,
+            messages: message ? [createTextMessage(message)] : null,
             signer: signer,
         }, cb);
     })
+}
+
+function createTextMessage(text) {
+    return {
+        app: "text",
+        payload_location: "inline",
+        payload_hash: objectHash.getBase64Hash(text),
+        payload: text
+    };
 }
 
 jointService.sendJoint = function (joint, sig) {
