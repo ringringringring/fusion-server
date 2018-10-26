@@ -1,23 +1,26 @@
 const db = require('trustnote-common/db');
 const validation = require('../utils/validation');
+const constants = require('trustnote-common/constants.js');
 const jointService = require('./jointService');
 const cacheService = require('./cacheService');
+const _ = require('lodash');
 
 let assetService = {};
 
 // 查询余额
 assetService.queryBalance = function (address, asset) {
     return new Promise(async (resolve, reject) => {
-        let err;
 
-        await validation.address(address).catch(e => { err = e });
-        if (err) {
+        try {
+            await validation.address(address).catch(e => { throw e })
+            await assetService.checkAsset(asset).catch(e => { throw e })
+        } catch (err) {
             reject(err);
             return;
         }
 
         if (asset === "TTT") {
-            asset = undefined;
+            asset = null;
         }
 
         db.query("SELECT asset, is_stable, SUM(amount) AS balance \n\
@@ -47,16 +50,17 @@ assetService.queryBalance = function (address, asset) {
 // 查询交易历史
 assetService.queryHistory = function (address, asset, pageXOffset, size) {
     return new Promise(async (resolve, reject) => {
-        let err;
 
-        await validation.address(address).catch(e => { err = e });
-        if (err) {
+        try {
+            await validation.address(address).catch(e => { throw e })
+            await assetService.checkAsset(asset).catch(e => { throw e })
+        } catch (err) {
             reject(err);
             return;
         }
 
         if (asset === "TTT") {
-            asset = undefined;
+            asset = null;
         }
 
         try {
@@ -77,18 +81,13 @@ assetService.queryHistory = function (address, asset, pageXOffset, size) {
 // 发起交易
 assetService.transfer = function (asset, payer, outputs, message) {
     return new Promise(async (resolve, reject) => {
+
         try {
             await validation.address(payer).catch(e => { throw "invalid address of payer" })
-            await validation.message(message).catch(e => { throw e })
+            if (message)
+                await validation.message(message).catch(e => { throw e })
             await validation.outputs(outputs).catch(e => { throw e })
-        } catch (err) {
-            reject(err);
-            return;
-        }
 
-        // outputs.push({ address: payer, amount: 0 })
-
-        try {
             await assetService.checkAsset(asset).catch(e => { throw e });
             await assetService.checkAssetIsStable(asset).catch(e => { throw e });
             await assetService.checkAssetBalance(payer, asset, outputs).catch(e => { throw e });
@@ -112,6 +111,16 @@ assetService.transfer = function (asset, payer, outputs, message) {
 
 assetService.sign = function (txid, sig) {
     return new Promise((resolve, reject) => {
+        try {
+            if (!_.isString(txid)) throw "txid cannot be empty"
+            if (!_.isString(sig)) throw "signature cannot be empty"
+            if (sig.length != constants.SIG_LENGTH) throw "signature format wrong"
+            if (txid.length != constants.HASH_LENGTH) throw "txid format wrong"
+        } catch (err) {
+            reject(err);
+            return;
+        }
+
         let isExist = cacheService.has(txid);
         if (!isExist) {
             reject("payment error, please re-pay later");
