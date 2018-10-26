@@ -120,6 +120,7 @@ assetService.sign = function (txid, sig) {
 
         let joint = cacheService.get(txid);
         jointService.sendJoint(joint, sig).then(ret => {
+            cacheService.remove(txid);
             resolve(ret);
         }).catch(err => {
             reject(err);
