@@ -53,5 +53,21 @@ const account = require('./routers/account')
 app.use('/api/v1/asset', asset)
 app.use('/api/v1/account', account)
 
+// 404 Error
+app.use(function (req, res, next) {
+    var err = new Error('Not Found');
+    err.status = 404;
+    next(err);
+});
+
+app.use(function (err, req, res, next) {
+    console.error(err.stack);
+    res.status(404).send({
+        network: 'devnet',
+        errCode: 404,
+        errMsg: "API error",
+        data: null
+    });
+});
 
 app.listen(6001);
