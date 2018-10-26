@@ -15,6 +15,16 @@ router.get('/balance/:address/:asset', function (req, res, next) {
     })
 })
 
+router.get('/txinfo/:txid', function (req, res, next) {
+    let txid = req.params.txid;
+
+    assetService.queryTxInfo(txid).then(joint => {
+        resp.handleResponse(res, joint);
+    }).catch(err => {
+        resp.handleResponse(res, null, err);
+    })
+})
+
 router.get('/txhistory/:address/:asset/:index/:size', function (req, res, next) {
 
     let asset, address, index, size, pageXOffset;

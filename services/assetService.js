@@ -47,6 +47,18 @@ assetService.queryBalance = function (address, asset) {
     })
 }
 
+// 查询单个交易信息
+assetService.queryTxInfo = function (txid) {
+    try {
+        if (!_.isString(txid)) throw "txid cannot be empty"
+        if (txid.length != constants.HASH_LENGTH) throw "txid format wrong"
+    } catch (err) {
+        return Promise.reject(err);
+    }
+
+    return jointService.readJoint(db, txid);
+}
+
 // 查询交易历史
 assetService.queryHistory = function (address, asset, pageXOffset, size) {
     return new Promise(async (resolve, reject) => {
