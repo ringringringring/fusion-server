@@ -61,7 +61,7 @@ jointService.validate = function (objJoint) {
                     objJoint, objValidationState,
                     null,
                     function onDone() {
-                        console.log("saved unit " + unit);
+                        console.log("saved unit " + objJoint);
                         validation_unlock();
                         resolve(objJoint);
                     }
