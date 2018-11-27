@@ -1,5 +1,5 @@
 {
-  "name": "uts",
+  "name": "fusion-server",
   "version": "1.0.0",
   "description": "Universal TrustNote Services",
   "main": "index.js",
