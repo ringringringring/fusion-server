@@ -12,7 +12,7 @@ responseUtil.handleResponse = function (res, data, err) {
         code = responseUtil.errCode.success;
 
     res.send({
-        network: 'devnet',
+        network: 'mainnet',
         errCode: code,
         errMsg: err || 'success',
         data: data
