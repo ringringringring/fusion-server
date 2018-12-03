@@ -79,4 +79,16 @@ router.post('/sign', function (req, res, next) {
     })
 })
 
+router.post('/commit', function (req, res, next) {
+
+    let txid = req.body.txid
+    let sig = req.body.sig
+
+    assetService.sign(txid, sig).then(ret => {
+        resp.handleResponse(res, ret);
+    }).catch(err => {
+        resp.handleResponse(res, null, err);
+    })
+})
+
 module.exports = router
